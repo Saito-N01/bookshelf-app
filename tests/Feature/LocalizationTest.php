@@ -15,6 +15,6 @@ class LocalizationTest extends TestCase
 
     public function test_auth_failed_message_is_japanese(): void
     {
-        $this->assertSame('ログイン情報が登録されていません', trans('auth.failed'));
+        $this->assertSame('ログイン情報が登録されていません。', trans('auth.failed'));
     }
 }
