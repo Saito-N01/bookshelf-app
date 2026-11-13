@@ -113,7 +113,7 @@ return [
     |
     */
 
-    'faker_locale' => 'ja',
+    'faker_locale' => 'ja_JP',
 
     /*
     |--------------------------------------------------------------------------
@@ -160,16 +160,16 @@ return [
     */
 
     'providers' => ServiceProvider::defaultProviders()->merge([
-            /*
+        /*
              * Package Service Providers...
              */
 
-            /*
+        /*
              * Application Service Providers...
              */
         AppServiceProvider::class,
         AuthServiceProvider::class,
-            // App\Providers\BroadcastServiceProvider::class,
+        // App\Providers\BroadcastServiceProvider::class,
         EventServiceProvider::class,
         RouteServiceProvider::class,
     ])->toArray(),
