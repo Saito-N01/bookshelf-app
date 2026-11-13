@@ -1,0 +1,49 @@
+<?php
+
+namespace Tests\Unit\Models;
+
+use App\Models\Book;
+use App\Models\Review;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ReviewTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_review_belongs_to_user(): void
+    {
+        $user = User::factory()->create();
+        $review = Review::factory()->for($user)->create();
+
+        $this->assertTrue($review->user->is($user));
+    }
+
+    public function test_review_belongs_to_book(): void
+    {
+        $book = Book::factory()->create();
+        $review = Review::factory()->for($book)->create();
+
+        $this->assertTrue($review->book->is($book));
+    }
+
+    public function test_review_has_liked_by_users(): void
+    {
+        $review = Review::factory()->create();
+        $users = User::factory()->count(2)->create();
+        $review->likedByUsers()->attach($users);
+
+        $this->assertCount(2, $review->likedByUsers);
+    }
+
+    public function test_factory_creates_rating_between_one_and_five(): void
+    {
+        $reviews = Review::factory()->count(10)->create();
+
+        foreach ($reviews as $review) {
+            $this->assertGreaterThanOrEqual(1, $review->rating);
+            $this->assertLessThanOrEqual(5, $review->rating);
+        }
+    }
+}
