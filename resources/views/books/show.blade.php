@@ -160,7 +160,12 @@
                                         <div class="mt-3 flex items-center justify-between">
                                             <!-- いいねボタン -->
                                             @auth
-                                                @if(Auth::user()->likedReviews->contains($review->id))
+                                                @if(Auth::user()->cannot('like', $review))
+                                                    <!-- 自分のレビューにはいいねできないため、件数だけを表示する -->
+                                                    <span class="text-gray-400 text-sm flex items-center">
+                                                        いいね ({{ $review->likedByUsers->count() }})
+                                                    </span>
+                                                @elseif(Auth::user()->likedReviews->contains($review->id))
                                                     <form action="{{ route('reviews.like', $review) }}" method="POST" class="inline" novalidate>
                                                         @csrf
                                                         <button type="submit" class="text-blue-500 hover:text-blue-700 text-sm flex items-center">

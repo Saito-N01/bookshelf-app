@@ -22,4 +22,12 @@ class ReviewPolicy
     {
         return $user->id === $review->user_id;
     }
+
+    /**
+     * レビューにいいねできるのは、投稿者以外のユーザーだけ（自分のレビューにはいいねできない）。
+     */
+    public function like(User $user, Review $review): bool
+    {
+        return $user->id !== $review->user_id;
+    }
 }
