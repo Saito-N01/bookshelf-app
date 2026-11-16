@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\FetchBookByIsbnRequest;
 use App\Http\Requests\IndexBookRequest;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
 use App\Models\Genre;
+use App\Services\GoogleBooksService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\Client\HttpClientException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -163,5 +167,31 @@ class BookController extends Controller
         $book->delete();
 
         return redirect()->route('books.index')->with('success', '書籍を削除しました。');
+    }
+
+    /**
+     * ISBN検索。Google Books API から書籍情報を取得し、登録フォームに入力する項目をJSONで返す。
+     * 失敗時は {"error": "メッセージ"} を返す（桁数不正は FetchBookByIsbnRequest が422を返す）。
+     *
+     * @param  FetchBookByIsbnRequest  $request  検証済みのISBN
+     * @param  GoogleBooksService  $googleBooks  Google Books API との通信を担当するサービス
+     * @return JsonResponse 書籍情報（200）、該当なし（404）、外部APIの障害（503）
+     */
+    public function fetchByIsbn(FetchBookByIsbnRequest $request, GoogleBooksService $googleBooks): JsonResponse
+    {
+        try {
+            $book = $googleBooks->findByIsbn($request->validated('isbn'));
+        } catch (HttpClientException $e) {
+            // 原因を調べられるよう、ログには残す
+            report($e);
+
+            return response()->json(['error' => '書籍情報を取得できませんでした。時間をおいて再度お試しください。'], 503);
+        }
+
+        if ($book === null) {
+            return response()->json(['error' => '該当する書籍が見つかりませんでした。'], 404);
+        }
+
+        return response()->json($book);
     }
 }

@@ -116,14 +116,30 @@ class BookCrudTest extends TestCase
         ]);
 
         $response->assertRedirect('/books/create');
+        // ISBN と出版日は任意項目のため、未入力でもエラーにならない
+        $response->assertSessionDoesntHaveErrors(['isbn', 'published_date']);
         $response->assertSessionHasErrors([
             'title' => 'タイトルは必須です。',
             'author' => '著者名は必須です。',
-            'isbn' => 'ISBNは必須です。',
-            'published_date' => '出版日は必須です。',
             'genres' => 'ジャンルを1つ以上選択してください。',
         ]);
         $this->assertDatabaseCount('books', 0);
+    }
+
+    public function test_store_succeeds_without_isbn_and_published_date(): void
+    {
+        $input = $this->validInput(['isbn' => '', 'published_date' => '']);
+
+        $this->actingAs($this->user)->post('/books', $input)->assertSessionHasNoErrors();
+        // ISBN のない書籍は、何冊でも登録できる（NULL は重複とみなされない）
+        $this->actingAs($this->user)->post('/books', $input)->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('books', 2);
+        $this->assertDatabaseHas('books', ['isbn' => null, 'published_date' => null]);
+
+        // 詳細画面では「未登録」と表示される
+        $book = Book::first();
+        $this->get('/books/'.$book->id)->assertOk()->assertSee('未登録');
     }
 
     public function test_store_fails_when_title_and_author_are_too_long(): void

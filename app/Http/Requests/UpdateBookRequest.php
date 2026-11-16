@@ -31,7 +31,7 @@ class UpdateBookRequest extends StoreBookRequest
         return array_merge(parent::rules(), [
             // 自分自身のISBNは重複とみなさない
             'isbn' => [
-                'required',
+                'nullable',
                 'string',
                 'digits:13',
                 Rule::unique('books', 'isbn')->ignore($this->route('book')),
