@@ -170,14 +170,17 @@ class BookCrudTest extends TestCase
         $this->assertDatabaseCount('books', 0);
     }
 
-    public function test_store_fails_when_description_is_too_long(): void
+    public function test_user_can_store_book_with_long_description(): void
     {
+        // 説明に文字数の上限はない
+        $description = str_repeat('あ', 1001);
+
         $response = $this->actingAs($this->user)->post('/books', $this->validInput([
-            'description' => str_repeat('あ', 1001),
+            'description' => $description,
         ]));
 
-        $response->assertSessionHasErrors(['description' => '説明は1000文字以内で入力してください。']);
-        $this->assertDatabaseCount('books', 0);
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('books', ['isbn' => '9784000000001', 'description' => $description]);
     }
 
     public function test_store_fails_when_image_url_is_invalid(): void
@@ -193,10 +196,11 @@ class BookCrudTest extends TestCase
     public function test_store_fails_when_image_url_is_too_long(): void
     {
         $response = $this->actingAs($this->user)->post('/books', $this->validInput([
-            'image_url' => 'https://example.com/'.str_repeat('a', 2030),
+            // 20文字 + 236文字 = 256文字
+            'image_url' => 'https://example.com/'.str_repeat('a', 236),
         ]));
 
-        $response->assertSessionHasErrors(['image_url' => '画像URLは2048文字以内で入力してください。']);
+        $response->assertSessionHasErrors(['image_url' => '画像URLは255文字以内で入力してください。']);
         $this->assertDatabaseCount('books', 0);
     }
 
