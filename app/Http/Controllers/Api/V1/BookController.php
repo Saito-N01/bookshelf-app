@@ -53,14 +53,15 @@ class BookController extends Controller
     }
 
     /**
-     * AP03: 書籍登録。成功時は 201 Created で、作成した書籍を返す。
+     * AP03: 書籍登録（要認証）。成功時は 201 Created で、作成した書籍を返す。
      *
      * @param  StoreBookRequest  $request  バリデーション済みの入力値
      * @return JsonResponse 作成した書籍（201 Created）
      */
     public function store(StoreBookRequest $request): JsonResponse
     {
-        $book = Book::create($request->safe()->except('genre_ids'));
+        // 登録者はリクエストから受け取らず、トークンで認証されたユーザーにする
+        $book = $request->user()->books()->create($request->safe()->except('genre_ids'));
         $book->genres()->sync($request->validated('genre_ids'));
 
         return (new BookResource($this->loadForResponse($book)))
@@ -85,7 +86,8 @@ class BookController extends Controller
     }
 
     /**
-     * AP04: 書籍更新。成功時は 200 OK で、更新後の書籍を返す。
+     * AP04: 書籍更新（要認証）。成功時は 200 OK で、更新後の書籍を返す。
+     * 作成者かどうかは UpdateBookRequest で判定する。
      *
      * @param  UpdateBookRequest  $request  バリデーション済みの入力値
      * @param  Book  $book  更新する書籍
@@ -100,7 +102,7 @@ class BookController extends Controller
     }
 
     /**
-     * AP05: 書籍削除。成功時は 204 No Content（ボディなし）を返す。
+     * AP05: 書籍削除（要認証）。作成者だけが削除できる。成功時は 204 No Content（ボディなし）を返す。
      * レビュー・いいね・お気に入り・ジャンルの紐付けは、外部キーの cascade で削除される。
      *
      * @param  Book  $book  削除する書籍
@@ -108,6 +110,8 @@ class BookController extends Controller
      */
     public function destroy(Book $book): Response
     {
+        $this->authorize('delete', $book);
+
         $book->delete();
 
         return response()->noContent();
