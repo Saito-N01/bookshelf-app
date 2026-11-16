@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\IndexBookRequest;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
 use App\Models\Genre;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -13,19 +15,63 @@ use Illuminate\View\View;
 class BookController extends Controller
 {
     /**
-     * 書籍一覧（トップ）。登録日の新しい順に10件ずつ表示する。
+     * 書籍一覧（トップ）。キーワード・ジャンルで絞り込み、指定の並び順で10件ずつ表示する。
      *
+     * @param  IndexBookRequest  $request  検証済みの検索条件（keyword / genre / sort / page）
      * @return View 書籍一覧画面
      */
-    public function index(): View
+    public function index(IndexBookRequest $request): View
     {
-        $books = Book::with('genres')
-            ->withAvg('reviews', 'rating')
-            ->latest()
-            ->orderByDesc('id')
-            ->paginate(10);
+        $keyword = $request->validated('keyword');
+        $genreId = $request->validated('genre');
 
-        return view('books.index', compact('books'));
+        $query = Book::with('genres')
+            ->withAvg('reviews', 'rating')
+            ->when($keyword !== null, function (Builder $query) use ($keyword): void {
+                // LIKE の特殊文字（% と _）を、そのままの文字として検索する
+                $like = '%'.addcslashes($keyword, '%_\\').'%';
+
+                // orWhere を括弧でまとめ、ジャンルの条件と正しく AND でつながるようにする
+                $query->where(function (Builder $query) use ($like): void {
+                    $query->where('title', 'like', $like)
+                        ->orWhere('author', 'like', $like);
+                });
+            })
+            ->when($genreId !== null, function (Builder $query) use ($genreId): void {
+                $query->whereHas('genres', fn (Builder $genres): Builder => $genres->where('genres.id', $genreId));
+            });
+
+        // ページを移動しても検索条件が引き継がれるよう、クエリ文字列をリンクに付ける
+        $books = $this->applySort($query, $request->validated('sort'))
+            ->paginate(10)
+            ->withQueryString();
+
+        // 検索フォームのジャンル選択肢
+        $genres = Genre::orderBy('id')->get();
+
+        return view('books.index', compact('books', 'genres'));
+    }
+
+    /**
+     * 並び順を適用する。不正な値や未指定は「新しい順」として扱う。
+     * どの並び順でも最後に id で並べ、同じ値の書籍の順番がページごとに変わらないようにする。
+     *
+     * @param  Builder  $query  並び順を付ける書籍のクエリ
+     * @param  mixed  $sort  並び順（oldest / title / rating。それ以外は新しい順）
+     * @return Builder 並び順を付けたクエリ
+     */
+    private function applySort(Builder $query, mixed $sort): Builder
+    {
+        return match ($sort) {
+            'oldest' => $query->oldest()->orderBy('id'),
+            'title' => $query->orderBy('title')->orderBy('id'),
+            // 平均評価の高い順。レビューのない書籍（平均が NULL）は末尾、同点は新しい順
+            'rating' => $query->orderByRaw('reviews_avg_rating IS NULL')
+                ->orderByDesc('reviews_avg_rating')
+                ->latest()
+                ->orderByDesc('id'),
+            default => $query->latest()->orderByDesc('id'),
+        };
     }
 
     /**
