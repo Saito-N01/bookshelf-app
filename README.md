@@ -21,9 +21,10 @@
 | 機能 | 内容 | ログイン |
 |---|---|---|
 | 会員登録・ログイン・ログアウト | Laravel Fortify を使用。ログイン後は元のページに戻る | - |
-| 書籍一覧 | 新しい順に 10 件ずつページネーション。平均評価を表示。`/` と `/books` の両方で表示 | 不要 |
+| 書籍一覧 | 10 件ずつページネーション。平均評価を表示。キーワード検索(タイトル・著者名)、ジャンル絞り込み、並び替え(新しい順・古い順・タイトル順・評価順)に対応。`/` と `/books` の両方で表示 | 不要 |
 | 書籍詳細 | 書籍情報・ジャンル・レビュー一覧・平均評価を表示 | 不要 |
-| 書籍の登録・編集・削除 | 編集・削除は登録者本人のみ(他人は 403) | 必要 |
+| 書籍の登録・編集・削除 | 編集・削除は登録者本人のみ(他人は 403)。ISBN と出版日は任意 | 必要 |
+| ISBN 検索 | 登録・編集画面で ISBN(13 桁)を入力すると、Google Books API から書籍情報を取得してフォームに自動入力 | 必要 |
 | レビュー | 1 ユーザー 1 書籍につき 1 件。評価(1〜5)とコメント(任意)。編集・削除は投稿者本人のみ | 必要 |
 | レビューへのいいね | トグル式。自分のレビューにはいいねできない | 必要 |
 | お気に入り | 書籍のお気に入り登録・解除と一覧表示 | 必要 |
@@ -78,8 +79,8 @@ erDiagram
         bigint_unsigned user_id FK
         varchar(255) title
         varchar(255) author
-        varchar(13) isbn UK
-        date published_date
+        varchar(13) isbn UK "NULL可"
+        date published_date "NULL可"
         text description
         varchar(2048) image_url
         timestamp created_at
@@ -112,6 +113,7 @@ erDiagram
 - `book_genre.genre_id` は `restrictOnDelete` のため、書籍が紐づくジャンルは削除できません。
 - `reviews` は `(user_id, book_id)` の UNIQUE 制約で、1 ユーザー 1 書籍 1 レビューを保証しています。
 - `book_genre`・`favorites`・`review_likes` は複合主キーで、`id` と `timestamps` を持ちません。
+- `books.isbn` と `books.published_date` は NULL 可です(ISBN のない書籍や、出版日が不明な書籍も登録できます)。`isbn` の UNIQUE 制約では NULL は重複とみなされません。
 
 ## 使用技術
 
@@ -126,6 +128,8 @@ erDiagram
 | フロントエンド | Vite | ^5.0 |
 | | Tailwind CSS(+ `@tailwindcss/forms`) | ^3.4 |
 | | Alpine.js | ^3.17 |
+| 外部 API | Google Books API(ISBN 検索) | v1 |
+| DB スキーマ変更 | doctrine/dbal(カラム変更のマイグレーションに使用) | 3.10(`^3.7`) |
 | テスト | PHPUnit | ^10.1 |
 | コード整形 | Laravel Pint | 1.30 |
 
@@ -150,6 +154,22 @@ cp .env.example .env
 ```
 
 `.env.example` には Sail 用の DB 設定(`DB_HOST=mysql`、`DB_USERNAME=sail`、`DB_PASSWORD=password`)がすでに入っているため、そのまま使えます。`DB_HOST` は `127.0.0.1` ではなく、Docker のコンテナ名 `mysql` です。
+
+#### Google Books API キーを設定する(ISBN 検索を使う場合)
+
+ISBN 検索は Google Books API を利用します。API キーなしでも呼び出せますが、キーなしのアクセスは利用回数の上限に達しやすく、「書籍情報を取得できませんでした。時間をおいて再度お試しください。」と表示されることがあります。次の手順で API キー(無料)を設定してください。
+
+1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成(または選択)する
+2. 「API とサービス」→「ライブラリ」で **Books API** を検索し、有効にする
+3. 「API とサービス」→「認証情報」→「認証情報を作成」→「API キー」でキーを発行する
+4. `.env` の `GOOGLE_BOOKS_API_KEY` に発行したキーを設定する
+
+```
+GOOGLE_BOOKS_API_URL=https://www.googleapis.com/books/v1/volumes
+GOOGLE_BOOKS_API_KEY=発行したAPIキー
+```
+
+API キーは `.env` にだけ記載し、`.env.example` やコードには書かないでください。Sail の起動後に `.env` を変更して反映されない場合は、`sail artisan config:clear` を実行してください。
 
 ### 3. Composer の依存パッケージをインストールする
 
@@ -237,6 +257,25 @@ sail bin pint
 
 テストは SQLite のインメモリ DB で実行されるため、開発用の MySQL のデータには影響しません。
 
+## ISBN 検索(Google Books API)
+
+書籍の登録・編集画面の「ISBN で検索」から呼び出される、ログイン必須のエンドポイントです。Google Books API の接続先と API キーは `.env`(`GOOGLE_BOOKS_API_URL` / `GOOGLE_BOOKS_API_KEY`)で管理しています。
+
+| メソッド | パス | 概要 |
+|---|---|---|
+| GET | `/books/isbn/{isbn}` | ISBN(13 桁)から書籍情報を取得して JSON で返す |
+
+| ステータス | 内容 |
+|---|---|
+| 200 | `{"title": "...", "author": "...", "published_date": "2012-06-23", "description": "...", "image_url": "..."}` |
+| 404 | `{"error": "該当する書籍が見つかりませんでした。"}` |
+| 422 | `{"error": "ISBNは13桁の数字で入力してください。"}` |
+| 503 | `{"error": "書籍情報を取得できませんでした。時間をおいて再度お試しください。"}`(Google Books API に接続できない、または回数上限) |
+
+- 著者が複数いる場合は「、」でつなげて返します。
+- 出版日が「2012」「2012-06」のように年月日がそろっていない場合は `null` を返します(出版日は未入力のまま登録できます)。
+- 取得できなかった項目は `null` になります。
+
 ## API エンドポイント一覧
 
 認証なしで利用できる JSON API です。ベース URL は `http://localhost/api/v1` です。
@@ -273,7 +312,7 @@ sail bin pint
 # 一覧(キーワード検索)
 curl "http://localhost/api/v1/books?keyword=夏目&per_page=10" -H "Accept: application/json"
 
-# 登録(ジャンルは genre_ids、登録者は user_id で指定)
+# 登録(ジャンルは genre_ids、登録者は user_id で指定。isbn と published_date は省略可)
 curl -X POST http://localhost/api/v1/books \
   -H "Accept: application/json" -H "Content-Type: application/json" \
   -d '{"user_id":1,"title":"サンプル","author":"著者名","isbn":"9784000000000","published_date":"2024-01-01","genre_ids":[1]}'

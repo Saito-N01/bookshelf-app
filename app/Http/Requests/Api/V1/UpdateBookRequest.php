@@ -22,7 +22,7 @@ class UpdateBookRequest extends StoreBookRequest
 
         // 自分自身のISBNは重複とみなさない
         $rules['isbn'] = [
-            'required',
+            'nullable',
             'string',
             'digits:13',
             Rule::unique('books', 'isbn')->ignore($this->route('book')),

@@ -291,6 +291,20 @@ class BookApiTest extends TestCase
         $this->assertDatabaseCount('book_genre', 2);
     }
 
+    public function test_store_accepts_null_isbn_and_published_date(): void
+    {
+        $payload = $this->validPayload([
+            'isbn' => null,
+            'published_date' => null,
+            'user_id' => User::factory()->create()->id,
+        ]);
+
+        $this->postJson('/api/v1/books', $payload)
+            ->assertCreated()
+            ->assertJsonPath('data.isbn', null)
+            ->assertJsonPath('data.published_date', null);
+    }
+
     public function test_store_returns_422_with_japanese_messages_when_required_fields_are_missing(): void
     {
         $response = $this->postJson('/api/v1/books', []);
@@ -298,8 +312,8 @@ class BookApiTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonPath('errors.title.0', 'タイトルは必須です。')
             ->assertJsonPath('errors.author.0', '著者名は必須です。')
-            ->assertJsonPath('errors.isbn.0', 'ISBNは必須です。')
-            ->assertJsonPath('errors.published_date.0', '出版日は必須です。')
+            ->assertJsonMissingPath('errors.isbn')
+            ->assertJsonMissingPath('errors.published_date')
             ->assertJsonPath('errors.genre_ids.0', 'ジャンルを1つ以上選択してください。')
             ->assertJsonPath('errors.user_id.0', '登録者IDは必須です。');
         $this->assertDatabaseCount('books', 0);
