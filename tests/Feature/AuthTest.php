@@ -112,6 +112,20 @@ class AuthTest extends TestCase
         $this->assertDatabaseCount('users', 0);
     }
 
+    public function test_register_fails_when_name_and_email_are_too_long(): void
+    {
+        $response = $this->post('/register', $this->registerInput([
+            'name' => str_repeat('あ', 256),
+            'email' => str_repeat('a', 244).'@example.com',
+        ]));
+
+        $response->assertSessionHasErrors([
+            'name' => 'お名前は255文字以内で入力してください。',
+            'email' => 'メールアドレスは255文字以内で入力してください。',
+        ]);
+        $this->assertDatabaseCount('users', 0);
+    }
+
     // ---------- ログイン ----------
 
     public function test_login_screen_is_displayed(): void
@@ -151,6 +165,37 @@ class AuthTest extends TestCase
             'email' => 'メールアドレスを入力してください。',
             'password' => 'パスワードを入力してください。',
         ]);
+        $this->assertGuest();
+    }
+
+    public function test_login_fails_when_email_is_not_email_format(): void
+    {
+        $response = $this->post('/login', ['email' => 'not-an-email', 'password' => 'password123']);
+
+        $response->assertSessionHasErrors(['email' => 'メールアドレスはメール形式で入力してください。']);
+        $this->assertGuest();
+    }
+
+    public function test_login_fails_with_unregistered_email(): void
+    {
+        $response = $this->post('/login', ['email' => 'nobody@example.com', 'password' => 'password123']);
+
+        $response->assertSessionHasErrors(['email' => 'ログイン情報が登録されていません。']);
+        $this->assertGuest();
+    }
+
+    public function test_login_is_blocked_after_five_failed_attempts_in_a_minute(): void
+    {
+        $user = User::factory()->create(['password' => Hash::make('password123')]);
+        $wrong = ['email' => $user->email, 'password' => 'wrong-password'];
+
+        // 1分あたり5回までは、通常の認証エラーとして処理される
+        for ($i = 0; $i < 5; $i++) {
+            $this->post('/login', $wrong)->assertSessionHasErrors('email');
+        }
+
+        // 6回目は、正しいパスワードでも 429 Too Many Requests で拒否される
+        $this->post('/login', ['email' => $user->email, 'password' => 'password123'])->assertStatus(429);
         $this->assertGuest();
     }
 
