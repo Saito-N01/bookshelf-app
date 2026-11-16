@@ -5,14 +5,24 @@ namespace App\Http\Requests\Api\V1;
 use Illuminate\Validation\Rule;
 
 /**
- * 公開APIの書籍更新。メッセージ・項目名は登録（StoreBookRequest）と同じで、次の2点が異なる。
- * - ISBNの一意性チェックから自身を除外する
- * - user_id は受け付けない（登録者は変更できない）
+ * 公開APIの書籍更新。ルール・メッセージ・項目名は登録（StoreBookRequest）と同じで、
+ * 認可と ISBN の一意性チェックだけが異なる。
  */
 class UpdateBookRequest extends StoreBookRequest
 {
     /**
-     * 書籍更新APIのバリデーションルール。登録のルールを引き継ぎ、ISBN の上書きと user_id の除外を行う。
+     * 更新できるのは書籍の作成者だけ（BookPolicy@update）。
+     * バリデーションより先に判定されるため、他人の書籍は入力内容にかかわらず403になる。
+     *
+     * @return bool 許可する場合は true（false のときは403になる）
+     */
+    public function authorize(): bool
+    {
+        return $this->user()->can('update', $this->route('book'));
+    }
+
+    /**
+     * 書籍更新APIのバリデーションルール。登録のルールを引き継ぎ、ISBN だけを上書きする。
      *
      * @return array<string, array<int, mixed>> 「項目名 => ルールの配列」の形式
      */
@@ -27,9 +37,6 @@ class UpdateBookRequest extends StoreBookRequest
             'digits:13',
             Rule::unique('books', 'isbn')->ignore($this->route('book')),
         ];
-
-        // ルールから外すことで、送られてきても検証済みデータに含まれず、更新に使われない
-        unset($rules['user_id']);
 
         return $rules;
     }

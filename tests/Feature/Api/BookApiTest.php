@@ -7,11 +7,20 @@ use App\Models\Genre;
 use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class BookApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * 書き込み系APIを呼ぶユーザーとして、Sanctum で認証する。
+     */
+    private function actingAsApiUser(): User
+    {
+        return Sanctum::actingAs(User::factory()->create());
+    }
 
     /**
      * 登録・更新APIの正しいリクエストボディ（各テストで一部だけ上書きして使う）
@@ -254,6 +263,7 @@ class BookApiTest extends TestCase
             ->assertNotFound()
             ->assertExactJson(['message' => '書籍が見つかりません。']);
 
+        $this->actingAsApiUser();
         $this->post('/api/v1/books', [])
             ->assertStatus(422)
             ->assertJsonPath('errors.title.0', 'タイトルは必須です。');
@@ -263,12 +273,11 @@ class BookApiTest extends TestCase
 
     public function test_store_creates_book_and_returns_201(): void
     {
-        $user = User::factory()->create();
+        $user = $this->actingAsApiUser();
         $genres = Genre::factory()->count(2)->create();
 
         $response = $this->postJson('/api/v1/books', $this->validPayload([
             'genre_ids' => $genres->pluck('id')->all(),
-            'user_id' => $user->id,
         ]));
 
         $book = Book::first();
@@ -293,10 +302,10 @@ class BookApiTest extends TestCase
 
     public function test_store_accepts_null_isbn_and_published_date(): void
     {
+        $this->actingAsApiUser();
         $payload = $this->validPayload([
             'isbn' => null,
             'published_date' => null,
-            'user_id' => User::factory()->create()->id,
         ]);
 
         $this->postJson('/api/v1/books', $payload)
@@ -307,6 +316,7 @@ class BookApiTest extends TestCase
 
     public function test_store_returns_422_with_japanese_messages_when_required_fields_are_missing(): void
     {
+        $this->actingAsApiUser();
         $response = $this->postJson('/api/v1/books', []);
 
         $response->assertStatus(422)
@@ -315,56 +325,47 @@ class BookApiTest extends TestCase
             ->assertJsonMissingPath('errors.isbn')
             ->assertJsonMissingPath('errors.published_date')
             ->assertJsonPath('errors.genre_ids.0', 'ジャンルを1つ以上選択してください。')
-            ->assertJsonPath('errors.user_id.0', '登録者IDは必須です。');
+            // 登録者は認証ユーザーから設定するため、user_id は検証しない
+            ->assertJsonMissingPath('errors.user_id');
         $this->assertDatabaseCount('books', 0);
     }
 
     public function test_store_returns_422_for_invalid_values(): void
     {
         Book::factory()->create(['isbn' => '9784000000009']);
-        $user = User::factory()->create();
+        $this->actingAsApiUser();
 
-        $this->postJson('/api/v1/books', $this->validPayload(['user_id' => $user->id, 'isbn' => '12345']))
+        $this->postJson('/api/v1/books', $this->validPayload(['isbn' => '12345']))
             ->assertStatus(422)
             ->assertJsonPath('errors.isbn.0', 'ISBNは13桁で入力してください。');
 
-        $this->postJson('/api/v1/books', $this->validPayload(['user_id' => $user->id, 'isbn' => '9784000000009']))
+        $this->postJson('/api/v1/books', $this->validPayload(['isbn' => '9784000000009']))
             ->assertStatus(422)
             ->assertJsonPath('errors.isbn.0', 'そのISBNは既に使用されています。');
 
-        $this->postJson('/api/v1/books', $this->validPayload(['user_id' => $user->id, 'image_url' => 'not-a-url']))
+        $this->postJson('/api/v1/books', $this->validPayload(['image_url' => 'not-a-url']))
             ->assertStatus(422)
             ->assertJsonPath('errors.image_url.0', '画像URLは有効なURL形式で入力してください。');
 
-        $this->postJson('/api/v1/books', $this->validPayload(['user_id' => $user->id, 'genre_ids' => [999]]))
+        $this->postJson('/api/v1/books', $this->validPayload(['genre_ids' => [999]]))
             ->assertStatus(422)
             ->assertJsonPath('errors', ['genre_ids.0' => ['選択されたジャンルが存在しません。']]);
-
-        $this->postJson('/api/v1/books', $this->validPayload(['user_id' => 999]))
-            ->assertStatus(422)
-            ->assertJsonPath('errors.user_id.0', '指定された登録者が存在しません。');
-
-        $this->postJson('/api/v1/books', $this->validPayload(['user_id' => 'abc']))
-            ->assertStatus(422)
-            ->assertJsonPath('errors.user_id.0', '登録者IDの値が不正です。');
 
         $this->assertDatabaseCount('books', 1);
     }
 
     public function test_store_limits_image_url_to_255_characters_and_does_not_limit_description(): void
     {
-        $user = User::factory()->create();
+        $this->actingAsApiUser();
 
         // 20文字 + 236文字 = 256文字
         $this->postJson('/api/v1/books', $this->validPayload([
-            'user_id' => $user->id,
             'image_url' => 'https://example.com/'.str_repeat('a', 236),
         ]))
             ->assertStatus(422)
             ->assertJsonPath('errors.image_url.0', '画像URLは255文字以内で入力してください。');
 
         $this->postJson('/api/v1/books', $this->validPayload([
-            'user_id' => $user->id,
             'description' => str_repeat('あ', 1001),
         ]))->assertCreated();
     }
@@ -373,7 +374,7 @@ class BookApiTest extends TestCase
 
     public function test_update_changes_book_and_syncs_genres(): void
     {
-        $book = Book::factory()->create(['isbn' => '9784000000001']);
+        $book = Book::factory()->for($this->actingAsApiUser())->create(['isbn' => '9784000000001']);
         $oldGenre = Genre::factory()->create();
         $book->genres()->attach($oldGenre);
         $newGenre = Genre::factory()->create(['name' => '新しいジャンル']);
@@ -396,7 +397,7 @@ class BookApiTest extends TestCase
 
     public function test_update_does_not_change_user_id(): void
     {
-        $book = Book::factory()->create();
+        $book = Book::factory()->for($this->actingAsApiUser())->create();
         $anotherUser = User::factory()->create();
 
         $this->putJson('/api/v1/books/'.$book->id, $this->validPayload(['user_id' => $anotherUser->id]))
@@ -408,6 +409,7 @@ class BookApiTest extends TestCase
 
     public function test_update_returns_404_json_for_nonexistent_id(): void
     {
+        $this->actingAsApiUser();
         $this->putJson('/api/v1/books/999', $this->validPayload())
             ->assertNotFound()
             ->assertExactJson(['message' => '書籍が見つかりません。']);
@@ -416,7 +418,7 @@ class BookApiTest extends TestCase
     public function test_update_returns_422_for_invalid_values(): void
     {
         Book::factory()->create(['isbn' => '9784000000009']);
-        $book = Book::factory()->create(['title' => '元のタイトル']);
+        $book = Book::factory()->for($this->actingAsApiUser())->create(['title' => '元のタイトル']);
 
         $this->putJson('/api/v1/books/'.$book->id, $this->validPayload(['isbn' => '9784000000009']))
             ->assertStatus(422)
@@ -433,7 +435,7 @@ class BookApiTest extends TestCase
 
     public function test_destroy_deletes_book_and_related_data_and_returns_204(): void
     {
-        $book = Book::factory()->create();
+        $book = Book::factory()->for($this->actingAsApiUser())->create();
         $genre = Genre::factory()->create();
         $book->genres()->attach($genre);
         $review = Review::factory()->for($book)->create();
@@ -456,6 +458,7 @@ class BookApiTest extends TestCase
 
     public function test_destroy_returns_404_json_for_nonexistent_id(): void
     {
+        $this->actingAsApiUser();
         $this->deleteJson('/api/v1/books/999')
             ->assertNotFound()
             ->assertExactJson(['message' => '書籍が見つかりません。']);

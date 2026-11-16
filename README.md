@@ -30,7 +30,7 @@
 | お気に入り | 書籍のお気に入り登録・解除と一覧表示 | 必要 |
 | ジャンル管理 | 一覧・詳細・登録・編集・削除。書籍が紐づくジャンルは削除不可 | 必要 |
 | ランキング | 平均評価の高い順(同点はレビュー件数順)に上位 10 件 | 不要 |
-| 公開 API | 書籍の一覧・詳細・登録・更新・削除(認証なし、JSON) | 不要 |
+| 公開 API | 書籍の一覧・詳細・登録・更新・削除(JSON)。一覧・詳細は認証なし、登録・更新・削除は Laravel Sanctum のトークン認証が必要(更新・削除は登録者本人のみ) | 読み取りは不要 |
 
 ### 画面一覧
 
@@ -122,7 +122,8 @@ erDiagram
 | 言語 | PHP | 8.5(Sail の実行環境) |
 | フレームワーク | Laravel | 10.50(`^10.10`) |
 | データベース | MySQL | 8.4 |
-| 認証 | Laravel Fortify | 1.36 |
+| 認証 | Laravel Fortify(Web 画面) | 1.36 |
+| | Laravel Sanctum(公開 API のトークン認証) | ^3.3 |
 | コンテナ | Docker / Docker Compose / Laravel Sail | Sail 1.69 |
 | DB 管理 | phpMyAdmin | latest |
 | フロントエンド | Vite | ^5.0 |
@@ -133,7 +134,6 @@ erDiagram
 | テスト | PHPUnit | ^10.1 |
 | コード整形 | Laravel Pint | 1.30 |
 
-※ Laravel Sanctum も導入済みですが、基本機能では使用していません。
 ※ 実際のバージョンは `composer.lock` と `package.json` を参照してください。
 
 ## 環境構築手順
@@ -278,15 +278,32 @@ sail bin pint
 
 ## API エンドポイント一覧
 
-認証なしで利用できる JSON API です。ベース URL は `http://localhost/api/v1` です。
+外部アプリ向けの JSON API です。ベース URL は `http://localhost/api/v1` です。
 
-| メソッド | パス | 概要 | 成功時 |
-|---|---|---|---|
-| GET | `/api/v1/books` | 書籍一覧を取得(絞り込み・ページネーション対応) | 200 |
-| GET | `/api/v1/books/{book}` | 書籍詳細を取得(ジャンル・レビュー付き) | 200 |
-| POST | `/api/v1/books` | 書籍を登録 | 201 |
-| PUT | `/api/v1/books/{book}` | 書籍を更新(`user_id` は変更不可) | 200 |
-| DELETE | `/api/v1/books/{book}` | 書籍を削除(レビュー・お気に入り・ジャンル紐付けも削除) | 204(ボディなし) |
+読み取り(GET)は認証なしで利用できます。書き込み(POST / PUT / DELETE)は Laravel Sanctum のトークン認証が必要で、ログイン API で取得したトークンを `Authorization: Bearer {token}` ヘッダーで送ります。
+
+| メソッド | パス | 概要 | 認証 | 成功時 |
+|---|---|---|---|---|
+| POST | `/api/v1/login` | ログイン(トークンを発行) | 不要 | 200 |
+| GET | `/api/v1/books` | 書籍一覧を取得(絞り込み・ページネーション対応) | 不要 | 200 |
+| GET | `/api/v1/books/{book}` | 書籍詳細を取得(ジャンル・レビュー付き) | 不要 | 200 |
+| POST | `/api/v1/books` | 書籍を登録(登録者は認証ユーザー) | 必要 | 201 |
+| PUT | `/api/v1/books/{book}` | 書籍を更新(登録者本人のみ) | 必要 | 200 |
+| DELETE | `/api/v1/books/{book}` | 書籍を削除(登録者本人のみ。レビュー・お気に入り・ジャンル紐付けも削除) | 必要 | 204(ボディなし) |
+
+### ログイン(`POST /api/v1/login`)
+
+`email` と `password` を送ると、トークンとユーザー情報を返します。
+
+```json
+{
+  "token": "1|xxxxxxxx",
+  "user": {"id": 1, "name": "山田太郎", "email": "yamada@example.com"}
+}
+```
+
+- 書籍の登録では、登録者(`user_id`)はリクエストから受け取らず、トークンで認証されたユーザーになります。
+- 書籍の更新・削除は、Web 画面と同じ `BookPolicy` で登録者本人だけに許可しています。
 
 ### 一覧のクエリパラメータ(`GET /api/v1/books`)
 
@@ -303,6 +320,8 @@ sail bin pint
 
 | ステータス | 内容 |
 |---|---|
+| 401 | `{"message": "認証が必要です。"}`(トークンがない・無効、またはログインのメールアドレス・パスワードが誤っている) |
+| 403 | `{"message": "この操作を行う権限がありません。"}`(他人の書籍の更新・削除) |
 | 404 | `{"message": "書籍が見つかりません。"}` |
 | 422 | バリデーションエラー(`message` と `errors`) |
 
@@ -312,10 +331,20 @@ sail bin pint
 # 一覧(キーワード検索)
 curl "http://localhost/api/v1/books?keyword=夏目&per_page=10" -H "Accept: application/json"
 
-# 登録(ジャンルは genre_ids、登録者は user_id で指定。isbn と published_date は省略可)
+# ログイン(レスポンスの token を、以降の書き込みで使う)
+curl -X POST http://localhost/api/v1/login \
+  -H "Accept: application/json" -H "Content-Type: application/json" \
+  -d '{"email":"yamada@example.com","password":"password"}'
+
+# 登録(ジャンルは genre_ids で指定。isbn と published_date は省略可)
 curl -X POST http://localhost/api/v1/books \
   -H "Accept: application/json" -H "Content-Type: application/json" \
-  -d '{"user_id":1,"title":"サンプル","author":"著者名","isbn":"9784000000000","published_date":"2024-01-01","genre_ids":[1]}'
+  -H "Authorization: Bearer 取得したトークン" \
+  -d '{"title":"サンプル","author":"著者名","isbn":"9784000000000","published_date":"2024-01-01","genre_ids":[1]}'
+
+# 削除(自分が登録した書籍のみ)
+curl -X DELETE http://localhost/api/v1/books/1 \
+  -H "Accept: application/json" -H "Authorization: Bearer 取得したトークン"
 ```
 
 ## 作成者
