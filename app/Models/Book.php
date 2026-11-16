@@ -33,7 +33,9 @@ class Book extends Model
     ];
 
     /**
-     * 書籍の登録者
+     * 書籍の登録者。
+     *
+     * @return BelongsTo 登録者（User）へのリレーション
      */
     public function user(): BelongsTo
     {
@@ -41,7 +43,9 @@ class Book extends Model
     }
 
     /**
-     * 書籍のジャンル（中間テーブル: book_genre）
+     * 書籍のジャンル（中間テーブル: book_genre）。
+     *
+     * @return BelongsToMany ジャンル（Genre）へのリレーション
      */
     public function genres(): BelongsToMany
     {
@@ -49,7 +53,9 @@ class Book extends Model
     }
 
     /**
-     * 書籍に投稿されたレビュー
+     * 書籍に投稿されたレビュー。
+     *
+     * @return HasMany レビュー（Review）へのリレーション
      */
     public function reviews(): HasMany
     {

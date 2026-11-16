@@ -22,7 +22,9 @@ class Review extends Model
     ];
 
     /**
-     * レビューの投稿者
+     * レビューの投稿者。
+     *
+     * @return BelongsTo 投稿者（User）へのリレーション
      */
     public function user(): BelongsTo
     {
@@ -30,7 +32,9 @@ class Review extends Model
     }
 
     /**
-     * レビューの対象書籍
+     * レビューの対象書籍。
+     *
+     * @return BelongsTo 対象書籍（Book）へのリレーション
      */
     public function book(): BelongsTo
     {
@@ -38,7 +42,9 @@ class Review extends Model
     }
 
     /**
-     * このレビューにいいねしたユーザー（中間テーブル: review_likes）
+     * このレビューにいいねしたユーザー（中間テーブル: review_likes）。
+     *
+     * @return BelongsToMany いいねしたユーザー（User）へのリレーション
      */
     public function likedByUsers(): BelongsToMany
     {

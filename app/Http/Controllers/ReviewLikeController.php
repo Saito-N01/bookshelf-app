@@ -11,6 +11,10 @@ class ReviewLikeController extends Controller
     /**
      * レビューへのいいねの追加・解除を切り替える。
      * 自分のレビューにはいいねできない（ReviewPolicy@like で403）。
+     *
+     * @param  Request  $request  ログインユーザーを取得するためのリクエスト
+     * @param  Review  $review  いいねを切り替えるレビュー
+     * @return RedirectResponse 元の画面へのリダイレクト
      */
     public function toggle(Request $request, Review $review): RedirectResponse
     {

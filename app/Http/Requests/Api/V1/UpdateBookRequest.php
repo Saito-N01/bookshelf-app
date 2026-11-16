@@ -12,7 +12,9 @@ use Illuminate\Validation\Rule;
 class UpdateBookRequest extends StoreBookRequest
 {
     /**
-     * @return array<string, array<int, mixed>>
+     * 書籍更新APIのバリデーションルール。登録のルールを引き継ぎ、ISBN の上書きと user_id の除外を行う。
+     *
+     * @return array<string, array<int, mixed>> 「項目名 => ルールの配列」の形式
      */
     public function rules(): array
     {

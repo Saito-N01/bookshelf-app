@@ -13,6 +13,10 @@ class ReviewController extends Controller
 {
     /**
      * レビューを投稿する。投稿者はログインユーザー。
+     *
+     * @param  StoreReviewRequest  $request  バリデーション済みの入力値
+     * @param  Book  $book  レビュー対象の書籍
+     * @return RedirectResponse 書籍詳細画面へのリダイレクト
      */
     public function store(StoreReviewRequest $request, Book $book): RedirectResponse
     {
@@ -26,6 +30,9 @@ class ReviewController extends Controller
 
     /**
      * レビュー編集画面。投稿者だけが表示できる。
+     *
+     * @param  Review  $review  編集するレビュー
+     * @return View レビュー編集画面
      */
     public function edit(Review $review): View
     {
@@ -38,6 +45,10 @@ class ReviewController extends Controller
 
     /**
      * レビューを更新する。投稿者かどうかは UpdateReviewRequest で判定する。
+     *
+     * @param  UpdateReviewRequest  $request  バリデーション済みの入力値
+     * @param  Review  $review  更新するレビュー
+     * @return RedirectResponse 書籍詳細画面へのリダイレクト
      */
     public function update(UpdateReviewRequest $request, Review $review): RedirectResponse
     {
@@ -49,6 +60,9 @@ class ReviewController extends Controller
     /**
      * レビューを削除する。投稿者だけが削除できる。
      * 紐づくいいねは、外部キーの cascade で削除される。
+     *
+     * @param  Review  $review  削除するレビュー
+     * @return RedirectResponse 書籍詳細画面へのリダイレクト
      */
     public function destroy(Review $review): RedirectResponse
     {

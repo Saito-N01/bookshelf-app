@@ -46,7 +46,9 @@ class User extends Authenticatable
     ];
 
     /**
-     * ユーザーが登録した書籍
+     * ユーザーが登録した書籍。
+     *
+     * @return HasMany 書籍（Book）へのリレーション
      */
     public function books(): HasMany
     {
@@ -54,7 +56,9 @@ class User extends Authenticatable
     }
 
     /**
-     * ユーザーが投稿したレビュー
+     * ユーザーが投稿したレビュー。
+     *
+     * @return HasMany レビュー（Review）へのリレーション
      */
     public function reviews(): HasMany
     {
@@ -62,7 +66,9 @@ class User extends Authenticatable
     }
 
     /**
-     * お気に入りに登録した書籍（中間テーブル: favorites）
+     * お気に入りに登録した書籍（中間テーブル: favorites）。
+     *
+     * @return BelongsToMany 書籍（Book）へのリレーション
      */
     public function favoriteBooks(): BelongsToMany
     {
@@ -70,7 +76,9 @@ class User extends Authenticatable
     }
 
     /**
-     * いいねしたレビュー（中間テーブル: review_likes）
+     * いいねしたレビュー（中間テーブル: review_likes）。
+     *
+     * @return BelongsToMany レビュー（Review）へのリレーション
      */
     public function likedReviews(): BelongsToMany
     {

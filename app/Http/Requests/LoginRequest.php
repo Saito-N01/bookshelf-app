@@ -11,7 +11,9 @@ use Laravel\Fortify\Http\Requests\LoginRequest as FortifyLoginRequest;
 class LoginRequest extends FortifyLoginRequest
 {
     /**
-     * @return array<string, array<int, string>>
+     * ログインのバリデーションルール。
+     *
+     * @return array<string, array<int, mixed>> 「項目名 => ルールの配列」の形式
      */
     public function rules(): array
     {
@@ -22,7 +24,9 @@ class LoginRequest extends FortifyLoginRequest
     }
 
     /**
-     * @return array<string, string>
+     * バリデーションエラー時の日本語メッセージ。
+     *
+     * @return array<string, string> 「項目名.ルール名 => メッセージ」の形式
      */
     public function messages(): array
     {

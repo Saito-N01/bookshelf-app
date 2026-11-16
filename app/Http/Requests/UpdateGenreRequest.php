@@ -11,7 +11,9 @@ use Illuminate\Validation\Rule;
 class UpdateGenreRequest extends StoreGenreRequest
 {
     /**
-     * @return array<string, array<int, mixed>>
+     * ジャンル更新のバリデーションルール。
+     *
+     * @return array<string, array<int, mixed>> 「項目名 => ルールの配列」の形式
      */
     public function rules(): array
     {
