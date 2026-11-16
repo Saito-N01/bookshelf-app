@@ -13,6 +13,8 @@ class UpdateBookRequest extends StoreBookRequest
     /**
      * 更新できるのは書籍の作成者だけ（BookPolicy@update）。
      * バリデーションより先に判定されるため、他人の書籍は入力内容にかかわらず403になる。
+     *
+     * @return bool 許可する場合は true（false のときは403になる）
      */
     public function authorize(): bool
     {
@@ -20,7 +22,9 @@ class UpdateBookRequest extends StoreBookRequest
     }
 
     /**
-     * @return array<string, array<int, mixed>>
+     * 書籍更新のバリデーションルール。登録のルールを引き継ぎ、ISBN だけを上書きする。
+     *
+     * @return array<string, array<int, mixed>> 「項目名 => ルールの配列」の形式
      */
     public function rules(): array
     {

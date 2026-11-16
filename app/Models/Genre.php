@@ -18,7 +18,9 @@ class Genre extends Model
     ];
 
     /**
-     * このジャンルに紐づく書籍（中間テーブル: book_genre）
+     * このジャンルに紐づく書籍（中間テーブル: book_genre）。
+     *
+     * @return BelongsToMany 書籍（Book）へのリレーション
      */
     public function books(): BelongsToMany
     {

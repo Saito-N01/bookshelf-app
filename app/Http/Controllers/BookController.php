@@ -6,6 +6,7 @@ use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
 use App\Models\Genre;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -13,6 +14,8 @@ class BookController extends Controller
 {
     /**
      * 書籍一覧（トップ）。登録日の新しい順に10件ずつ表示する。
+     *
+     * @return View 書籍一覧画面
      */
     public function index(): View
     {
@@ -27,6 +30,8 @@ class BookController extends Controller
 
     /**
      * 書籍登録画面。全ジャンルをチェックボックスで表示する。
+     *
+     * @return View 書籍登録画面
      */
     public function create(): View
     {
@@ -37,6 +42,9 @@ class BookController extends Controller
 
     /**
      * 書籍を登録する。登録者はログインユーザー。
+     *
+     * @param  StoreBookRequest  $request  バリデーション済みの入力値
+     * @return RedirectResponse 登録した書籍の詳細画面へのリダイレクト
      */
     public function store(StoreBookRequest $request): RedirectResponse
     {
@@ -48,12 +56,15 @@ class BookController extends Controller
 
     /**
      * 書籍詳細。ジャンルと、レビュー（投稿者・いいねしたユーザー）を表示する。
+     *
+     * @param  Book  $book  表示する書籍（URLのIDから自動で取得される）
+     * @return View 書籍詳細画面
      */
     public function show(Book $book): View
     {
         $book->load([
             'genres',
-            'reviews' => fn ($query) => $query->latest()->orderByDesc('id'),
+            'reviews' => fn (HasMany $query): HasMany => $query->latest()->orderByDesc('id'),
             'reviews.user',
             'reviews.likedByUsers',
         ]);
@@ -63,6 +74,9 @@ class BookController extends Controller
 
     /**
      * 書籍編集画面。作成者だけが表示できる。
+     *
+     * @param  Book  $book  編集する書籍
+     * @return View 書籍編集画面
      */
     public function edit(Book $book): View
     {
@@ -76,6 +90,10 @@ class BookController extends Controller
 
     /**
      * 書籍を更新する。作成者かどうかは UpdateBookRequest で判定する。
+     *
+     * @param  UpdateBookRequest  $request  バリデーション済みの入力値
+     * @param  Book  $book  更新する書籍
+     * @return RedirectResponse 書籍詳細画面へのリダイレクト
      */
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
@@ -88,6 +106,9 @@ class BookController extends Controller
     /**
      * 書籍を削除する。作成者だけが削除できる。
      * レビュー・いいね・お気に入り・ジャンルの紐付けは、外部キーの cascade で削除される。
+     *
+     * @param  Book  $book  削除する書籍
+     * @return RedirectResponse 書籍一覧へのリダイレクト
      */
     public function destroy(Book $book): RedirectResponse
     {

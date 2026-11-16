@@ -8,6 +8,8 @@ class StoreGenreRequest extends FormRequest
 {
     /**
      * ジャンルの操作はログイン済みなら誰でもできる（ログインの確認は auth ミドルウェアで行う）。
+     *
+     * @return bool 許可する場合は true（false のときは403になる）
      */
     public function authorize(): bool
     {
@@ -15,7 +17,9 @@ class StoreGenreRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, mixed>>
+     * ジャンル登録のバリデーションルール。
+     *
+     * @return array<string, array<int, mixed>> 「項目名 => ルールの配列」の形式
      */
     public function rules(): array
     {
@@ -25,7 +29,9 @@ class StoreGenreRequest extends FormRequest
     }
 
     /**
-     * @return array<string, string>
+     * バリデーションエラー時の日本語メッセージ。
+     *
+     * @return array<string, string> 「項目名.ルール名 => メッセージ」の形式
      */
     public function messages(): array
     {
@@ -38,7 +44,9 @@ class StoreGenreRequest extends FormRequest
     }
 
     /**
-     * @return array<string, string>
+     * エラーメッセージで使う項目名（日本語）。
+     *
+     * @return array<string, string> 「項目名 => 日本語の表示名」の形式
      */
     public function attributes(): array
     {

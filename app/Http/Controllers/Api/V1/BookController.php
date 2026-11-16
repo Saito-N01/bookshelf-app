@@ -8,6 +8,8 @@ use App\Http\Requests\Api\V1\StoreBookRequest;
 use App\Http\Requests\Api\V1\UpdateBookRequest;
 use App\Http\Resources\BookResource;
 use App\Models\Book;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -16,6 +18,9 @@ class BookController extends Controller
 {
     /**
      * AP01: 書籍一覧。キーワード・ジャンルでの絞り込みと、ページネーションに対応する。
+     *
+     * @param  IndexBookRequest  $request  検証済みの検索条件（keyword / genre_id / page / per_page）
+     * @return AnonymousResourceCollection 書籍の一覧（data / links / meta）
      */
     public function index(IndexBookRequest $request): AnonymousResourceCollection
     {
@@ -26,18 +31,18 @@ class BookController extends Controller
         $books = Book::with('genres')
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
-            ->when($keyword !== null, function ($query) use ($keyword) {
+            ->when($keyword !== null, function (Builder $query) use ($keyword): void {
                 // LIKE の特殊文字（% と _）を、そのままの文字として検索する
                 $like = '%'.addcslashes($keyword, '%_\\').'%';
 
                 // orWhere を括弧でまとめ、ジャンルの条件と正しく AND でつながるようにする
-                $query->where(function ($query) use ($like) {
+                $query->where(function (Builder $query) use ($like): void {
                     $query->where('title', 'like', $like)
                         ->orWhere('author', 'like', $like);
                 });
             })
-            ->when($genreId !== null, function ($query) use ($genreId) {
-                $query->whereHas('genres', fn ($genres) => $genres->where('genres.id', $genreId));
+            ->when($genreId !== null, function (Builder $query) use ($genreId): void {
+                $query->whereHas('genres', fn (Builder $genres): Builder => $genres->where('genres.id', $genreId));
             })
             ->latest()
             ->orderByDesc('id')
@@ -49,6 +54,9 @@ class BookController extends Controller
 
     /**
      * AP03: 書籍登録。成功時は 201 Created で、作成した書籍を返す。
+     *
+     * @param  StoreBookRequest  $request  バリデーション済みの入力値
+     * @return JsonResponse 作成した書籍（201 Created）
      */
     public function store(StoreBookRequest $request): JsonResponse
     {
@@ -62,11 +70,14 @@ class BookController extends Controller
 
     /**
      * AP02: 書籍詳細。ジャンルと、レビュー（投稿者名つき）を含めて返す。
+     *
+     * @param  Book  $book  取得する書籍
+     * @return BookResource 書籍の詳細
      */
     public function show(Book $book): BookResource
     {
         $book->load([
-            'reviews' => fn ($query) => $query->latest()->orderByDesc('id'),
+            'reviews' => fn (HasMany $query): HasMany => $query->latest()->orderByDesc('id'),
             'reviews.user',
         ]);
 
@@ -75,6 +86,10 @@ class BookController extends Controller
 
     /**
      * AP04: 書籍更新。成功時は 200 OK で、更新後の書籍を返す。
+     *
+     * @param  UpdateBookRequest  $request  バリデーション済みの入力値
+     * @param  Book  $book  更新する書籍
+     * @return BookResource 更新後の書籍
      */
     public function update(UpdateBookRequest $request, Book $book): BookResource
     {
@@ -87,6 +102,9 @@ class BookController extends Controller
     /**
      * AP05: 書籍削除。成功時は 204 No Content（ボディなし）を返す。
      * レビュー・いいね・お気に入り・ジャンルの紐付けは、外部キーの cascade で削除される。
+     *
+     * @param  Book  $book  削除する書籍
+     * @return Response ボディなしのレスポンス（204 No Content）
      */
     public function destroy(Book $book): Response
     {
@@ -97,6 +115,9 @@ class BookController extends Controller
 
     /**
      * レスポンスに必要なジャンル・平均評価・レビュー件数を読み込む。
+     *
+     * @param  Book  $book  読み込み先の書籍
+     * @return Book 関連データを読み込んだ書籍
      */
     private function loadForResponse(Book $book): Book
     {
