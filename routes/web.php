@@ -3,6 +3,7 @@
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\GenreController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\RankingController;
 use App\Http\Controllers\ReadingPlanController;
 use App\Http\Controllers\ReviewController;
@@ -60,6 +61,10 @@ Route::middleware('auth')->group(function () {
         ->parameters(['reading-plans' => 'plan']);
     Route::post('/reading-plans/{plan}/complete', [ReadingPlanController::class, 'complete'])
         ->name('reading-plans.complete');
+
+    // 通知
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'read'])->name('notifications.read');
 });
 
 // 書籍詳細（公開）。「/books/create」が {book} として扱われないよう、最後に定義する
