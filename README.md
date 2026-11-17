@@ -31,6 +31,7 @@
 | ジャンル管理 | 一覧・詳細・登録・編集・削除。書籍が紐づくジャンルは削除不可 | 必要 |
 | ランキング | 平均評価の高い順(同点はレビュー件数順)に上位 10 件 | 不要 |
 | 読書計画 | 自分が登録した書籍に「いつまでに読むか」の期日を設定。一覧(状態で絞り込み)・登録・期日の変更・読了・削除。状態は進行中・完了・期限切れの 3 つで、同じ書籍の進行中の計画は 1 件まで。完了済みの計画は変更不可 | 必要 |
+| 通知 | 読書計画のリマインダー(期日の 3 日前・当日・3 日後)を通知一覧に表示。未読は「未読」バッジで区別し、「既読にする」で既読化。ヘッダーのベルアイコンに未読件数を表示 | 必要 |
 | 公開 API | 書籍の一覧・詳細・登録・更新・削除(JSON)。一覧・詳細は認証なし、登録・更新・削除は Laravel Sanctum のトークン認証が必要(更新・削除は登録者本人のみ) | 読み取りは不要 |
 
 ### 画面一覧
@@ -45,6 +46,7 @@
 | `/reviews/{review}/edit` | レビューの編集 | 必要 |
 | `/favorites` | お気に入り一覧 | 必要 |
 | `/reading-plans`、`/reading-plans/create`、`/reading-plans/{plan}/edit` | 読書計画の一覧、作成、編集 | 必要 |
+| `/notifications` | 通知一覧 | 必要 |
 | `/genres`、`/genres/create`、`/genres/{genre}`、`/genres/{genre}/edit` | ジャンル管理 | 必要 |
 
 ## ER 図
@@ -62,6 +64,7 @@ erDiagram
     reviews ||--o{ review_likes : ""
     users ||--o{ reading_plans : "計画"
     books ||--o{ reading_plans : "対象"
+    users ||--o{ notifications : "受信"
     users {
         bigint_unsigned id PK
         varchar(255) name
@@ -124,6 +127,16 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
+    notifications {
+        char(36) id PK "UUID"
+        varchar(255) type "通知クラス名"
+        varchar(255) notifiable_type
+        bigint_unsigned notifiable_id "受信者のID"
+        text data "JSON"
+        timestamp read_at "NULL=未読"
+        timestamp created_at
+        timestamp updated_at
+    }
 ```
 
 - 書籍を削除すると、レビュー・お気に入り・ジャンルの紐付けも外部キーの cascade で一緒に削除されます。
@@ -132,6 +145,7 @@ erDiagram
 - `book_genre`・`favorites`・`review_likes` は複合主キーで、`id` と `timestamps` を持ちません。
 - `reading_plans.status` は PHP の Enum(`App\Enums\ReadingPlanStatus`)で管理し、進行中・完了・期限切れの 3 つの状態を持ちます。ユーザーまたは書籍を削除すると、その読書計画も cascade で削除されます。
 - `reading_plans.notified_*_at` はリマインダー通知の送信日時で、同じ通知を二重に送らないための判定に使います。
+- `notifications` は Laravel 標準の通知テーブルです。`data` には `timing`(three_days_before / on_due_date / three_days_after)・`title`・`body`・`plan_id`・`book_title`・`target_date` を JSON で保存します。
 - `books.isbn` と `books.published_date` は NULL 可です(ISBN のない書籍や、出版日が不明な書籍も登録できます)。`isbn` の UNIQUE 制約では NULL は重複とみなされません。
 
 ## 使用技術
