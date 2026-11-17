@@ -4,6 +4,7 @@ use App\Http\Controllers\BookController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\GenreController;
 use App\Http\Controllers\RankingController;
+use App\Http\Controllers\ReadingPlanController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewLikeController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +53,13 @@ Route::middleware('auth')->group(function () {
 
     // ジャンル管理
     Route::resource('genres', GenreController::class);
+
+    // 読書計画（詳細画面はない。URLのパラメータ名は {plan}）
+    Route::resource('reading-plans', ReadingPlanController::class)
+        ->except('show')
+        ->parameters(['reading-plans' => 'plan']);
+    Route::post('/reading-plans/{plan}/complete', [ReadingPlanController::class, 'complete'])
+        ->name('reading-plans.complete');
 });
 
 // 書籍詳細（公開）。「/books/create」が {book} として扱われないよう、最後に定義する
