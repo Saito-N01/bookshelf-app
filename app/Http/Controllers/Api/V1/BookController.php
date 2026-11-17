@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class BookController extends Controller
 {
@@ -60,9 +61,15 @@ class BookController extends Controller
      */
     public function store(StoreBookRequest $request): JsonResponse
     {
-        // 登録者はリクエストから受け取らず、トークンで認証されたユーザーにする
-        $book = $request->user()->books()->create($request->safe()->except('genre_ids'));
-        $book->genres()->sync($request->validated('genre_ids'));
+        // 書籍の保存とジャンルの紐付けを1つのトランザクションにまとめる。
+        // 途中で失敗した場合は両方とも取り消され、ジャンルのない書籍だけが残ることを防ぐ
+        $book = DB::transaction(function () use ($request): Book {
+            // 登録者はリクエストから受け取らず、トークンで認証されたユーザーにする
+            $book = $request->user()->books()->create($request->safe()->except('genre_ids'));
+            $book->genres()->sync($request->validated('genre_ids'));
+
+            return $book;
+        });
 
         return (new BookResource($this->loadForResponse($book)))
             ->response()
@@ -95,8 +102,11 @@ class BookController extends Controller
      */
     public function update(UpdateBookRequest $request, Book $book): BookResource
     {
-        $book->update($request->safe()->except('genre_ids'));
-        $book->genres()->sync($request->validated('genre_ids'));
+        // 書籍の更新とジャンルの付け替えを1つのトランザクションにまとめる（途中で失敗したら更新前の状態に戻る）
+        DB::transaction(function () use ($request, $book): void {
+            $book->update($request->safe()->except('genre_ids'));
+            $book->genres()->sync($request->validated('genre_ids'));
+        });
 
         return new BookResource($this->loadForResponse($book));
     }
