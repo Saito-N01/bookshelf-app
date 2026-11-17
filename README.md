@@ -58,6 +58,8 @@ erDiagram
     books ||--o{ favorites : ""
     users ||--o{ review_likes : ""
     reviews ||--o{ review_likes : ""
+    users ||--o{ reading_plans : "計画"
+    books ||--o{ reading_plans : "対象"
     users {
         bigint_unsigned id PK
         varchar(255) name
@@ -107,12 +109,27 @@ erDiagram
         bigint_unsigned user_id PK,FK
         bigint_unsigned review_id PK,FK
     }
+    reading_plans {
+        bigint_unsigned id PK
+        bigint_unsigned user_id FK
+        bigint_unsigned book_id FK
+        date target_date
+        varchar(20) status "in_progress / completed / expired"
+        timestamp completed_at "NULL可"
+        timestamp notified_three_days_before_at "NULL可"
+        timestamp notified_on_due_at "NULL可"
+        timestamp notified_three_days_after_at "NULL可"
+        timestamp created_at
+        timestamp updated_at
+    }
 ```
 
 - 書籍を削除すると、レビュー・お気に入り・ジャンルの紐付けも外部キーの cascade で一緒に削除されます。
 - `book_genre.genre_id` は `restrictOnDelete` のため、書籍が紐づくジャンルは削除できません。
 - `reviews` は `(user_id, book_id)` の UNIQUE 制約で、1 ユーザー 1 書籍 1 レビューを保証しています。
 - `book_genre`・`favorites`・`review_likes` は複合主キーで、`id` と `timestamps` を持ちません。
+- `reading_plans.status` は PHP の Enum(`App\Enums\ReadingPlanStatus`)で管理し、進行中・完了・期限切れの 3 つの状態を持ちます。ユーザーまたは書籍を削除すると、その読書計画も cascade で削除されます。
+- `reading_plans.notified_*_at` はリマインダー通知の送信日時で、同じ通知を二重に送らないための判定に使います。
 - `books.isbn` と `books.published_date` は NULL 可です(ISBN のない書籍や、出版日が不明な書籍も登録できます)。`isbn` の UNIQUE 制約では NULL は重複とみなされません。
 
 ## 使用技術
@@ -237,7 +254,7 @@ sail npm run dev
 | 佐藤美咲 | sato@example.com |
 | 高橋健太 | takahashi@example.com |
 
-あわせて、ジャンル 10 件、書籍 11 件、レビュー 32 件、お気に入り、レビューへのいいねも投入されます。
+あわせて、ジャンル 10 件、書籍 11 件、レビュー 32 件、お気に入り、レビューへのいいね、読書計画 6 件も投入されます。読書計画の期日は、シーダーを実行した日を起点に設定されます(山田太郎に 5 件、鈴木花子に 1 件)。
 
 ## テストとコード整形
 

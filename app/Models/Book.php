@@ -61,4 +61,14 @@ class Book extends Model
     {
         return $this->hasMany(Review::class);
     }
+
+    /**
+     * この書籍を対象にした読書計画。
+     *
+     * @return HasMany 読書計画（ReadingPlan）へのリレーション
+     */
+    public function readingPlans(): HasMany
+    {
+        return $this->hasMany(ReadingPlan::class);
+    }
 }
