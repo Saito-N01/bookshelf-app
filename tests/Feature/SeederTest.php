@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Book;
 use App\Models\Genre;
+use App\Models\ReadingPlan;
 use App\Models\Review;
 use App\Models\User;
 use Database\Seeders\BookSeeder;
@@ -26,6 +27,7 @@ class SeederTest extends TestCase
         $this->assertSame(10, Genre::count());
         $this->assertSame(11, Book::count());
         $this->assertSame(32, Review::count());
+        $this->assertSame(6, ReadingPlan::count());
     }
 
     public function test_user_seeder_creates_users_with_hashed_password(): void
