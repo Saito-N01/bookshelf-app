@@ -10,12 +10,13 @@ use Illuminate\Database\Seeder;
 class BookSeeder extends Seeder
 {
     /**
-     * 書籍を登録する。登録者は最初のユーザー（山田太郎）。
+     * 書籍を登録する。登録者は、登録済みのユーザーからランダムに選ぶ
+     * （マイ読書レポートや読書計画で、複数のユーザーが所有する書籍を確認できるようにするため）。
      * ISBN で重複を防ぎ、ジャンルは sync で紐付ける。
      */
     public function run(): void
     {
-        $user = User::first();
+        $users = User::all();
         $genreIds = Genre::pluck('id', 'name');
 
         $books = [
@@ -113,7 +114,7 @@ class BookSeeder extends Seeder
             $book = Book::firstOrCreate(
                 ['isbn' => $data['isbn']],
                 [
-                    'user_id' => $user->id,
+                    'user_id' => $users->random()->id,
                     'title' => $data['title'],
                     'author' => $data['author'],
                     'published_date' => $data['published_date'],

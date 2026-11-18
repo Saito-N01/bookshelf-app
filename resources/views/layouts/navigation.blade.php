@@ -33,6 +33,9 @@
                     <x-nav-link :href="route('genres.index')" :active="request()->routeIs('genres.*')">
                         {{ __('ジャンル管理') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
+                        {{ __('マイレポート') }}
+                    </x-nav-link>
                     <x-nav-link :href="route('reading-plans.index')" :active="request()->routeIs('reading-plans.*')">
                         {{ __('読書計画') }}
                     </x-nav-link>
@@ -112,6 +115,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('genres.index')" :active="request()->routeIs('genres.*')">
                 {{ __('ジャンル管理') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
+                {{ __('マイレポート') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('reading-plans.index')" :active="request()->routeIs('reading-plans.*')">
                 {{ __('読書計画') }}

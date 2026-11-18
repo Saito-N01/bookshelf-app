@@ -26,7 +26,9 @@ class SeederTest extends TestCase
         $this->assertSame(5, User::count());
         $this->assertSame(10, Genre::count());
         $this->assertSame(11, Book::count());
-        $this->assertSame(32, Review::count());
+        // レビューは各書籍に2〜4件（ランダム）のため、11冊で22〜44件
+        $this->assertGreaterThanOrEqual(22, Review::count());
+        $this->assertLessThanOrEqual(44, Review::count());
         $this->assertSame(6, ReadingPlan::count());
     }
 
@@ -54,14 +56,19 @@ class SeederTest extends TestCase
         $this->assertSame(16, DB::table('book_genre')->count());
     }
 
-    public function test_books_are_registered_by_first_user_with_genres_and_image(): void
+    public function test_books_are_registered_by_seeded_users_with_genres_and_image(): void
     {
         $this->seed();
+
+        // 登録者はランダムだが、必ずシーダーで作った5ユーザーのいずれか
+        $userIds = User::pluck('id')->all();
+        foreach (Book::all() as $book) {
+            $this->assertContains($book->user_id, $userIds);
+        }
 
         $book = Book::where('isbn', '9784422100524')->first();
 
         $this->assertSame('人を動かす', $book->title);
-        $this->assertTrue($book->user->is(User::first()));
         $this->assertEqualsCanonicalizing(
             ['ビジネス', '自己啓発'],
             $book->genres->pluck('name')->all()
@@ -70,15 +77,43 @@ class SeederTest extends TestCase
         $this->assertNotEmpty($book->description);
     }
 
-    public function test_each_book_has_two_to_four_reviews_with_rating_three_to_five(): void
+    public function test_each_book_has_two_to_four_reviews_from_different_users(): void
     {
         $this->seed();
 
-        foreach (Book::withCount('reviews')->get() as $book) {
-            $this->assertGreaterThanOrEqual(2, $book->reviews_count);
-            $this->assertLessThanOrEqual(4, $book->reviews_count);
+        foreach (Book::with('reviews')->get() as $book) {
+            $this->assertGreaterThanOrEqual(2, $book->reviews->count());
+            $this->assertLessThanOrEqual(4, $book->reviews->count());
+            // 同じユーザーが同じ書籍に2件投稿していない
+            $this->assertSame($book->reviews->count(), $book->reviews->unique('user_id')->count());
         }
-        $this->assertSame(0, Review::where('rating', '<', 3)->orWhere('rating', '>', 5)->count());
+    }
+
+    public function test_reviews_have_rating_one_to_five_and_comment_matching_rating(): void
+    {
+        $this->seed();
+
+        $comments = [
+            5 => ['素晴らしい本でした！', '人生が変わりました。', '何度も読み返しています。'],
+            4 => ['とても参考になりました。', '読みやすくておすすめです。', '期待通りの内容でした。'],
+            3 => ['普通でした。', '可もなく不可もなく。', '期待したほどではなかった。'],
+            2 => ['少し期待外れでした。', '内容が薄い印象。', 'もう少し深掘りしてほしかった。'],
+            1 => ['残念ながら合いませんでした。', '期待と違いました。'],
+        ];
+
+        foreach (Review::all() as $review) {
+            $this->assertContains($review->rating, [1, 2, 3, 4, 5]);
+            $this->assertContains($review->comment, $comments[$review->rating]);
+        }
+    }
+
+    public function test_seeding_repeatedly_always_creates_valid_data(): void
+    {
+        // ランダムな値でも、ユニーク制約（同じユーザー×同じ書籍）に違反せず毎回成功すること
+        foreach (range(1, 5) as $i) {
+            $this->artisan('migrate:fresh', ['--seed' => true])->assertSuccessful();
+            $this->assertSame(11, Book::count());
+        }
     }
 
     public function test_each_user_has_three_to_five_favorites(): void

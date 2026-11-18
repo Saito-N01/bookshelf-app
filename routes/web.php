@@ -6,6 +6,7 @@ use App\Http\Controllers\GenreController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\RankingController;
 use App\Http\Controllers\ReadingPlanController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewLikeController;
 use Illuminate\Support\Facades\Route;
@@ -61,6 +62,9 @@ Route::middleware('auth')->group(function () {
         ->parameters(['reading-plans' => 'plan']);
     Route::post('/reading-plans/{plan}/complete', [ReadingPlanController::class, 'complete'])
         ->name('reading-plans.complete');
+
+    // マイ読書レポート
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
     // 通知
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
