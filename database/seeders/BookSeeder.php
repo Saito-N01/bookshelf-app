@@ -11,6 +11,7 @@ class BookSeeder extends Seeder
 {
     /**
      * 書籍を登録する。登録者は、登録済みのユーザーからランダムに選ぶ
+     * （マイ読書レポートや読書計画で、複数のユーザーが所有する書籍を確認できるようにするため）。
      * ISBN で重複を防ぎ、ジャンルは sync で紐付ける。
      */
     public function run(): void
